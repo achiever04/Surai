@@ -1,0 +1,82 @@
+# AI Model Configuration
+
+# Face Detection
+face_detection:
+  model: "mtcnn"
+  confidence_threshold: 0.9
+  min_face_size: 20
+  scale_factor: 0.709
+  
+# Face Recognition
+face_recognition:
+  model: "buffalo_l"  # InsightFace model
+  embedding_size: 512
+  similarity_threshold: 0.4
+  backend: "onnx"
+  device: "cpu"
+  
+# Emotion Detection
+emotion_detection:
+  enabled: true
+  model: "deepface"
+  backend: "opencv"
+  emotions:
+    - "angry"
+    - "disgust"
+    - "fear"
+    - "happy"
+    - "sad"
+    - "surprise"
+    - "neutral"
+  
+# Pose Estimation
+pose_estimation:
+  enabled: true
+  model: "mediapipe"
+  complexity: 0  # 0=Lite, 1=Full, 2=Heavy
+  min_detection_confidence: 0.5
+  min_tracking_confidence: 0.5
+  
+# Anti-Spoofing
+anti_spoofing:
+  enabled: true
+  model: "silent-face-anti-spoofing"
+  threshold: 0.7
+  
+# Age Estimation
+age_estimation:
+  enabled: false
+  model: "deepface"
+  backend: "opencv"
+
+# Model Paths
+model_paths:
+  base_dir: "./storage/models/pretrained"
+  insightface: "./storage/models/pretrained/buffalo_l"
+  mtcnn: "auto"  # Auto-download
+  mediapipe: "auto"
+  deepface: "auto"
+
+# Performance Settings
+performance:
+  # CPU Optimization
+  num_threads: 4
+  inter_op_threads: 2
+  
+  # Memory Management
+  max_batch_size: 1
+  enable_quantization: true
+  
+  # Caching
+  cache_embeddings: true
+  cache_ttl: 3600  # seconds
+  
+  # Frame Processing
+  max_image_dimension: 640
+  jpeg_quality: 85
+
+# Model Update Settings
+model_updates:
+  check_for_updates: false
+  auto_update: false
+  update_channel: "stable"

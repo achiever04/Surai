@@ -1,0 +1,154 @@
+## Quick Start
+
+### 1. Install Prerequisites
+
+```bash
+# Install Docker Desktop
+# Download from: https://www.docker.com/products/docker-desktop/
+
+# Install Python 3.10
+# Download from: https://www.python.org/downloads/
+
+# Install Node.js 18 LTS
+# Download from: https://nodejs.org/
+```
+
+### 2. Clone and Setup
+
+```bash
+# Clone repository
+git clone 
+cd ai-surveillance-platform
+
+# Run setup script (Windows)
+scripts\setup_environment.bat
+
+# OR manually setup:
+python -m venv venv
+venv\Scripts\activate
+pip install torch==2.1.1+cpu torchvision==0.16.1+cpu --index-url https://download.pytorch.org/whl/cpu
+pip install -r requirements.txt
+```
+
+### 3. Start Services
+
+```bash
+# Start Docker Desktop first
+
+# Start all services
+scripts\start_services.bat
+
+# OR manually:
+docker-compose up -d
+python scripts\init_database.py
+python scripts\create_admin_user.py
+cd backend && python -m app.main
+cd frontend && npm run dev
+```
+
+### 4. Access Application
+
+- Frontend: http://localhost:5173
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/api/v1/docs
+- Default credentials: `admin` / `admin123`
+
+## Architecture
+
+```
+┌─────────────────┐
+│  React Frontend      │
+└────────┬────────┘
+         │
+    ┌────▼─────┐
+    │  FastAPI    │
+    │  Backend    │
+    └────┬─────┘
+         │
+    ┌────▼──────────────────┐
+    │  AI Detection Engine  │
+    │  - Face Recognition   │
+    │  - Emotion Detection  │
+    │  - Pose Estimation    │
+    └────┬──────────────────┘
+         │
+┌────────┴────────────────────┐
+│  PostgreSQL  │  Redis  │ IPFS│
+│  Hyperledger Fabric Network │
+└─────────────────────────────┘
+```
+
+## Configuration
+
+Edit `.env` file for configuration:
+
+```bash
+# API Settings
+SECRET_KEY=your-secret-key-here
+ACCESS_TOKEN_EXPIRE_MINUTES=60
+
+# Database
+POSTGRES_USER=surveillance_user
+POSTGRES_PASSWORD=secure_password_123
+
+# AI Models
+CONFIDENCE_THRESHOLD=0.70
+PROCESS_EVERY_NTH_FRAME=3
+
+# Features
+EMOTION_DETECTION_ENABLED=true
+POSE_ESTIMATION_ENABLED=true
+ANTI_SPOOF_ENABLED=true
+```
+
+## Development
+
+### Adding a Camera
+
+```python
+from camera_integration.camera_manager import CameraManager, CameraConfig
+
+manager = CameraManager()
+config = CameraConfig(
+    id=1,
+    name="Entry Gate",
+    source="0",  # Webcam index or RTSP URL
+    fps=10,
+    resolution=(1280, 720)
+)
+manager.add_camera(config)
+manager.start_camera(1)
+```
+
+### Enrolling in Watchlist
+
+```bash
+# Via API
+curl -X POST http://localhost:8000/api/v1/watchlist \
+  -H "Authorization: Bearer " \
+  -F "person_data={\"person_id\":\"P001\",\"name\":\"John Doe\",\"category\":\"missing\"}" \
+  -F "photos=@photo1.jpg"
+```
+
+## Testing
+
+```bash
+# Run backend tests
+cd backend
+pytest
+
+# Run with coverage
+pytest --cov=app --cov-report=html
+```
+
+## Troubleshooting
+
+See [docs/troubleshooting.md](docs/troubleshooting.md) for common issues and solutions.
+
+## License
+
+[Your License Here]
+
+## Contributors
+
+[Your Name/Team]

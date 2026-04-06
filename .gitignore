@@ -1,0 +1,151 @@
+# =======================================================
+# General / OS / IDE
+# =======================================================
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# =======================================================
+# Environment Variables & Secrets (CRITICAL)
+# =======================================================
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+# Keep .env.example so developers know what keys are needed
+!*.example
+
+# =======================================================
+# Python (Backend, AI Engine, Scripts)
+# =======================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.onnx_cache
+*.onnx
+.pt
+# Virtual Environments
+venv/
+env/
+ENV/
+.venv/
+*.pt
+models/*.pt
+# Testing & Coverage
+.coverage
+htmlcov/
+.pytest_cache/
+
+# =======================================================
+# Node.js / Frontend / Chaincode
+# =======================================================
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+package-lock.json
+
+# Frontend Build Output
+frontend/build/
+frontend/dist/
+
+# =======================================================
+# AI & Machine Learning Data (Too large for Git)
+# =======================================================
+# Pretrained models and checkpoints
+storage/
+storage/models/pretrained/*
+storage/models/pretrained/
+storage/models/checkpoints/*
+storage/models/checkpoints/
+!storage/models/pretrained/.gitkeep
+!storage/models/checkpoints/.gitkeep
+
+# Temporary processing data
+data/temp/*
+!data/temp/.gitkeep
+
+# Face Embeddings Cache
+data/embeddings/*
+!data/embeddings/.gitkeep
+
+# Watchlist images (Real personal data should not be committed)
+data/watchlist/*
+!data/watchlist/.gitkeep
+
+# =======================================================
+# Evidence & Local Storage
+# =======================================================
+# Recorded video clips and snapshots
+storage/local/evidence/*
+!storage/local/evidence/.gitkeep
+
+# =======================================================
+# Hyperledger Fabric (Blockchain)
+# =======================================================
+# Generated crypto material (certificates/keys)
+blockchain/fabric-network/organizations/peerOrganizations/
+blockchain/fabric-network/organizations/ordererOrganizations/
+
+# Generated genesis blocks and channel transactions
+blockchain/fabric-network/channel-artifacts/*
+!blockchain/fabric-network/channel-artifacts/.gitkeep
+
+# Local wallet identities
+wallet/
+keystore/
+
+# Fabric bin/ binaries (if downloaded locally)
+blockchain/fabric-network/bin/
+blockchain/fabric-network/config/
+
+# =======================================================
+# Logs
+# =======================================================
+*.log
+logs/backend/*
+logs/ai_engine/*
+logs/blockchain/*
+logs/federated_learning/*
+!logs/backend/.gitkeep
+!logs/ai_engine/.gitkeep
+!logs/blockchain/.gitkeep
+!logs/federated_learning/.gitkeep
+
+
+ai_engine/models/weights/
+
+# =======================================================
+# Database
+# =======================================================
+*.sqlite3
+*.db
+
+# =======================================================
+# Docker
+# =======================================================
+# Override files often contain local specific configurations
+docker-compose.override.yml

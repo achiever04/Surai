@@ -1,0 +1,27 @@
+{
+  "name": "ai-surveillance-platform",
+  "version": "1.0.0",
+  "description": "AI-Powered Multi-Camera Intelligence Platform",
+  "scripts": {
+    "install-all": "pip install -r requirements.txt && cd frontend && npm install",
+    "setup": "python scripts/setup_environment.py",
+    "dev": "concurrently \"cd backend && python -m app.main\" \"cd frontend && npm run dev\"",
+    "start-docker": "docker-compose up -d",
+    "stop-docker": "docker-compose down",
+    "init-db": "python scripts/init_database.py",
+    "create-admin": "python scripts/create_admin_user.py"
+  },
+  "repository": {
+    "type": "git",
+    "url": "your-repo-url"
+  },
+  "keywords": [
+    "surveillance",
+    "ai",
+    "facial-recognition",
+    "blockchain",
+    "federated-learning"
+  ],
+  "author": "Your Name",
+  "license": "MIT"
+}

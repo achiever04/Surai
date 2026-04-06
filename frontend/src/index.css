@@ -1,0 +1,220 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* ══════════════════════════════════════════════════════════════════
+   THEME: CSS Custom Properties  
+   These define the global light/dark palette used throughout the app.
+   ══════════════════════════════════════════════════════════════════ */
+
+@layer base {
+  :root {
+    --color-surface:        255, 255, 255;       /* white */
+    --color-surface-alt:    243, 244, 246;       /* gray-100 */
+    --color-surface-hover:  249, 250, 251;       /* gray-50 */
+    --color-text-primary:   31, 41, 55;          /* gray-800 */
+    --color-text-secondary: 107, 114, 128;       /* gray-500 */
+    --color-text-muted:     156, 163, 175;       /* gray-400 */
+    --color-border:         229, 231, 235;       /* gray-200 */
+    --color-border-light:   243, 244, 246;       /* gray-100 */
+  }
+
+  .dark {
+    --color-surface:        31, 41, 55;          /* gray-800 */
+    --color-surface-alt:    17, 24, 39;          /* gray-900 */
+    --color-surface-hover:  55, 65, 81;          /* gray-700 */
+    --color-text-primary:   249, 250, 251;       /* gray-50 */
+    --color-text-secondary: 156, 163, 175;       /* gray-400 */
+    --color-text-muted:     107, 114, 128;       /* gray-500 */
+    --color-border:         55, 65, 81;          /* gray-700 */
+    --color-border-light:   55, 65, 81;          /* gray-700 */
+  }
+
+  /* ── Smooth transitions on theme change ── */
+  *, *::before, *::after {
+    transition-property: background-color, border-color, color, box-shadow;
+    transition-timing-function: ease-in-out;
+    transition-duration: 150ms;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   DARK MODE OVERRIDES
+   These remap the most common Tailwind utility classes so the
+   ENTIRE app becomes dark-aware without adding dark: to every element.
+   ══════════════════════════════════════════════════════════════════ */
+
+/* ── Backgrounds ── */
+.dark .bg-white        { background-color: rgb(var(--color-surface)) !important; }
+.dark .bg-gray-50      { background-color: rgb(var(--color-surface-hover)) !important; }
+.dark .bg-gray-100     { background-color: rgb(var(--color-surface-alt)) !important; }
+
+/* ── Text ── */
+.dark .text-gray-900   { color: rgb(var(--color-text-primary)) !important; }
+.dark .text-gray-800   { color: rgb(var(--color-text-primary)) !important; }
+.dark .text-gray-700   { color: rgb(249, 250, 251) !important; }
+.dark .text-gray-600   { color: rgb(209, 213, 219) !important; }
+.dark .text-gray-500   { color: rgb(var(--color-text-secondary)) !important; }
+.dark .text-gray-400   { color: rgb(var(--color-text-muted)) !important; }
+
+/* ── Borders ── */
+.dark .border-gray-200 { border-color: rgb(var(--color-border)) !important; }
+.dark .border-gray-300 { border-color: rgb(var(--color-border)) !important; }
+.dark .border-gray-100 { border-color: rgb(var(--color-border-light)) !important; }
+
+/* ── Divide ── */
+.dark .divide-gray-100 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(55, 65, 81) !important; }
+.dark .divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: rgb(55, 65, 81) !important; }
+
+/* ── Shadows ── */
+.dark .shadow-sm  { box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.3) !important; }
+.dark .shadow-md  { box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.4), 0 2px 4px -2px rgb(0 0 0 / 0.3) !important; }
+.dark .shadow-lg  { box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.4), 0 4px 6px -4px rgb(0 0 0 / 0.3) !important; }
+.dark .shadow-2xl { box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.5) !important; }
+
+/* ── Border dashed (empty states) ── */
+.dark .border-dashed { border-color: rgb(75, 85, 99) !important; }
+
+/* ── Ring colors ── */
+.dark .ring-gray-200   { --tw-ring-color: rgb(55 65 81) !important; }
+.dark .ring-gray-300   { --tw-ring-color: rgb(75 85 99) !important; }
+
+/* ── Input/Select elements ── */
+.dark select,
+.dark input[type="text"],
+.dark input[type="search"],
+.dark input[type="number"],
+.dark textarea {
+  background-color: rgb(55, 65, 81) !important;
+  border-color: rgb(75, 85, 99) !important;
+  color: rgb(249, 250, 251) !important;
+}
+.dark select option {
+  background-color: rgb(31, 41, 55);
+  color: rgb(249, 250, 251);
+}
+
+/* ── Table ── */
+.dark table thead  { background-color: rgb(var(--color-surface-hover)) !important; }
+.dark table tbody tr { border-color: rgb(55, 65, 81) !important; }
+.dark table tbody tr:hover { background-color: rgb(55, 65, 81) !important; }
+.dark th           { color: rgb(var(--color-text-secondary)) !important; border-color: rgb(55, 65, 81) !important; }
+.dark td           { color: rgb(var(--color-text-primary)) !important; border-color: rgb(55, 65, 81) !important; }
+
+/* ── Scrollbar ── */
+.dark ::-webkit-scrollbar       { width: 8px; }
+.dark ::-webkit-scrollbar-track { background: rgb(17, 24, 39); }
+.dark ::-webkit-scrollbar-thumb { background: rgb(55, 65, 81); border-radius: 4px; }
+.dark ::-webkit-scrollbar-thumb:hover { background: rgb(75, 85, 99); }
+
+/* ── Modal backdrops ── */
+.dark .bg-black\/50 { background-color: rgba(0, 0, 0, 0.7) !important; }
+
+/* ══════════════════════════════════════════════════════════════════
+   BASE STYLES
+   ══════════════════════════════════════════════════════════════════ */
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.dark body {
+  background-color: rgb(17, 24, 39);
+  color: rgb(249, 250, 251);
+}
+
+code {
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+/* Toast slide-in animation */
+@keyframes slide-in {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-in {
+  animation: slide-in 0.3s ease-out;
+}
+
+/* ── Notification Center Animations ─────────────────────────── */
+
+/* Popup entrance — slide + scale from right */
+@keyframes notification-popup-enter {
+  from {
+    transform: translateX(100%) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+.notification-popup-enter {
+  animation: notification-popup-enter 0.35s cubic-bezier(0.21, 1.02, 0.73, 1) forwards;
+}
+
+/* Progress bar countdown */
+@keyframes notification-progress {
+  from { width: 100%; }
+  to   { width: 0%; }
+}
+.notification-progress {
+  animation: notification-progress linear forwards;
+}
+
+/* Bell ring on new notifications */
+@keyframes bell-ring {
+  0%   { transform: rotate(0deg); }
+  15%  { transform: rotate(14deg); }
+  30%  { transform: rotate(-12deg); }
+  45%  { transform: rotate(10deg); }
+  60%  { transform: rotate(-8deg); }
+  75%  { transform: rotate(4deg); }
+  100% { transform: rotate(0deg); }
+}
+.notification-bell-ring {
+  animation: bell-ring 0.6s ease-in-out;
+  animation-iteration-count: 2;
+  transform-origin: top center;
+}
+
+/* Unread badge pulse */
+@keyframes badge-pulse {
+  0%, 100% { transform: scale(1); }
+  50%      { transform: scale(1.15); }
+}
+.notification-badge-pulse {
+  animation: badge-pulse 2s ease-in-out infinite;
+}
+
+/* Panel entrance */
+@keyframes panel-enter {
+  from {
+    transform: translateY(-8px) scale(0.97);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+.notification-panel-enter {
+  animation: panel-enter 0.2s ease-out forwards;
+}

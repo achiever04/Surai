@@ -1,0 +1,24 @@
+{
+  "name": "evidence-contract",
+  "version": "1.0.0",
+  "description": "Evidence management smart contract for surveillance platform",
+  "main": "index.js",
+  "scripts": {
+    "start": "fabric-chaincode-node start",
+    "test": "mocha test/**/*.js"
+  },
+  "engines": {
+    "node": ">=16",
+    "npm": ">=8"
+  },
+  "dependencies": {
+    "fabric-contract-api": "^2.5.0",
+    "fabric-shim": "^2.5.0"
+  },
+  "devDependencies": {
+    "chai": "^4.3.7",
+    "mocha": "^10.2.0"
+  },
+  "author": "AI Surveillance Platform",
+  "license": "Apache-2.0"
+}

@@ -1,0 +1,95 @@
+# Camera Configuration Template
+# Copy and customize for your deployment
+
+# Default camera settings
+defaults:
+  fps: 10
+  resolution:
+    width: 1280
+    height: 720
+  buffer_size: 1
+  reconnect_delay: 5  # seconds
+  frame_timeout: 10   # seconds
+
+# Camera profiles
+cameras:
+  # Webcam example
+  - id: 1
+    name: "Main Entrance Webcam"
+    type: "webcam"
+    source: "0"  # Device index
+    location: "Main Entrance"
+    enabled: true
+    settings:
+      fps: 10
+      resolution:
+        width: 1280
+        height: 720
+  
+  # IP Camera (RTSP) example
+  - id: 2
+    name: "Parking Lot IP Camera"
+    type: "rtsp"
+    source: "rtsp://admin:password@192.168.1.100:554/stream1"
+    location: "Parking Lot"
+    enabled: false
+    settings:
+      fps: 15
+      resolution:
+        width: 1920
+        height: 1080
+      reconnect_delay: 10
+  
+  # Video file example (for testing)
+  - id: 3
+    name: "Test Video"
+    type: "file"
+    source: "./test_videos/sample.mp4"
+    location: "Testing"
+    enabled: false
+    settings:
+      fps: 30
+      loop: true
+
+# Processing settings per camera
+processing:
+  # Enable/disable AI features per camera
+  features:
+    face_detection: true
+    face_recognition: true
+    emotion_detection: true
+    pose_estimation: true
+    anti_spoof: true
+    age_estimation: false
+  
+  # Frame processing
+  process_every_n_frames: 3
+  motion_detection_enabled: true
+  motion_threshold: 25.0
+  
+  # Quality thresholds
+  min_face_size: 50  # pixels
+  min_confidence: 0.7
+
+# Recording settings
+recording:
+  enabled: true
+  output_dir: "./storage/local/evidence"
+  codec: "mp4v"
+  buffer_seconds: 10  # Pre-event buffer
+  post_event_seconds: 5  # Post-event recording
+  
+# Alert settings
+alerts:
+  enabled: true
+  notify_on:
+    - "face_match"
+    - "suspicious_behavior"
+  cooldown_seconds: 60  # Min time between alerts for same person
+
+# Storage settings
+storage:
+  local_retention_days: 30
+  auto_cleanup: true
+  ipfs_upload: true
+  blockchain_anchor: true

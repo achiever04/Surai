@@ -1,0 +1,61 @@
+cpu:
+  # Number of threads for inference
+  num_threads: 4
+  interop_threads: 2
+  
+  # Quantization settings
+  enable_quantization: true
+  quantization_dtype: "qint8"
+
+memory:
+  # Memory thresholds (percentage)
+  warning_threshold: 80
+  critical_threshold: 90
+  
+  # Reduce load when threshold exceeded
+  auto_reduce_load: true
+
+frame_processing:
+  # Process every Nth frame (higher = lower CPU usage)
+  process_every_n: 3
+  
+  # Maximum image dimension (pixels)
+  max_dimension: 640
+  
+  # Skip processing when no motion
+  motion_detection: true
+  motion_threshold: 25.0
+
+model_optimization:
+  # Use ONNX Runtime for inference
+  use_onnx: true
+  
+  # Model precision
+  use_fp16: false  # Not beneficial on CPU
+  use_int8: true
+  
+  # Batch inference
+  batch_size: 1  # Keep at 1 for real-time
+  
+caching:
+  # Cache face embeddings in Redis
+  cache_embeddings: true
+  cache_ttl: 3600  # seconds
+  
+  # Cache watchlist
+  cache_watchlist: true
+
+database:
+  # Connection pool size
+  pool_size: 5
+  max_overflow: 10
+  
+  # Query optimization
+  use_indexes: true
+  batch_inserts: true
+
+blockchain:
+  # Batch blockchain writes
+  batch_receipts: true
+  batch_size: 10
+  batch_interval: 30  # seconds
