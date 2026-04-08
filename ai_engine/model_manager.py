@@ -41,43 +41,43 @@ class AIModelManager:
             return
         
         # Model instances (lazy loaded)
-        self._face_detector = None
+        self._unified_perception_engine = None
         self._face_recognizer = None
         self._emotion_detector = None
-        self._pose_estimator = None
-        self._weapon_detector = None
         self._anti_spoof = None
         self._age_estimator = None
         self._deepfake_detector = None
-        self._object_detector = None
         
         # Shared detection pipeline (singleton across all consumers)
         self._detection_pipeline = None
         
         # Individual locks for each model (prevents blocking)
-        self._face_detector_lock = threading.Lock()
+        self._unified_perception_engine_lock = threading.Lock()
         self._face_recognizer_lock = threading.Lock()
         self._emotion_detector_lock = threading.Lock()
-        self._pose_estimator_lock = threading.Lock()
-        self._weapon_detector_lock = threading.Lock()
         self._anti_spoof_lock = threading.Lock()
         self._age_estimator_lock = threading.Lock()
         self._deepfake_detector_lock = threading.Lock()
-        self._object_detector_lock = threading.Lock()
         self._detection_pipeline_lock = threading.Lock()
         
         # Model loading status
         self._models_loaded = {
-            'face_detector': False,
+            'unified_perception_engine': False,
             'face_recognizer': False,
             'emotion_detector': False,
-            'pose_estimator': False,
-            'weapon_detector': False,
             'anti_spoof': False,
             'age_estimator': False,
             'deepfake_detector': False,
-            'object_detector': False
+            'weapon_detector': False,
+            'pose_estimator': False,
+            'face_detector': False,
         }
+        
+        # Backward compatibility properties
+        self._weapon_detector = None
+        self._weapon_detector_lock = threading.Lock()
+        self._pose_estimator_lock = threading.Lock()
+        self._pose_estimator = None
         
         # Performance monitoring
         self._load_times = {}
@@ -86,16 +86,26 @@ class AIModelManager:
         self._initialized = True
         logger.info("AIModelManager singleton initialized")
     
-    def get_face_detector(self):
-        """
-        Get face detector - USE InsightFace's built-in detector (FAST!)
-        
-        CRITICAL OPTIMIZATION: Don't load MTCNN (takes 78 seconds!)
-        InsightFace already has a detector built-in that's much faster.
-        """
-        # Return InsightFace's detector (already loaded with face_recognizer)
-        # This is instant and avoids the 78-second MTCNN load
-        return self.get_face_recognizer()  # InsightFace has built-in detector
+    def get_unified_perception_engine(self):
+        """Get Unified YOLOv8 Model - loaded on startup or lazily with thread safety"""
+        if self._unified_perception_engine is None:
+            with self._unified_perception_engine_lock:
+                if self._unified_perception_engine is None:
+                    logger.info("Loading Unified Perception Engine (YOLOv8)...")
+                    start_time = time.time()
+                    
+                    from ai_engine.models.unified_perception_engine import UnifiedPerceptionEngine
+                    self._unified_perception_engine = UnifiedPerceptionEngine()
+                    
+                    load_time = time.time() - start_time
+                    self._load_times['unified_perception_engine'] = load_time
+                    self._models_loaded['unified_perception_engine'] = True
+                    self._inference_counts['unified_perception_engine'] = 0
+                    
+                    logger.info(f"Unified Perception Engine loaded in {load_time:.2f}s")
+                    self._log_memory_usage()
+                    
+        return self._unified_perception_engine
     
     
     def get_face_recognizer(self):
@@ -140,33 +150,16 @@ class AIModelManager:
         
         return self._emotion_detector
     
-    def get_pose_estimator(self):
-        """Get pose estimator (MediaPipe) - lazy loaded with thread safety"""
-        if self._pose_estimator is None:
-            with self._pose_estimator_lock:
-                if self._pose_estimator is None:
-                    logger.info("Loading Pose Estimator (MediaPipe)...")
-                    start_time = time.time()
-                    
-                    from ai_engine.models.pose_estimator import PoseEstimator
-                    self._pose_estimator = PoseEstimator(min_detection_confidence=0.5)
-                    
-                    load_time = time.time() - start_time
-                    self._load_times['pose_estimator'] = load_time
-                    self._models_loaded['pose_estimator'] = True
-                    self._inference_counts['pose_estimator'] = 0
-                    
-                    logger.info(f"Pose Estimator loaded in {load_time:.2f}s")
-                    self._log_memory_usage()
-        
-        return self._pose_estimator
-    
+    def get_face_detector(self):
+        """Backward compatibility: returns get_face_recognizer() for InsightFace _get_faces()."""
+        return self.get_face_recognizer()
+
     def get_weapon_detector(self):
-        """Get weapon detector (YOLO26-N ONNX / onnxruntime) - lazy loaded with thread safety"""
+        """Get weapon detector - lazy loaded with thread safety"""
         if self._weapon_detector is None:
             with self._weapon_detector_lock:
                 if self._weapon_detector is None:
-                    logger.info("Loading Weapon Detector (YOLO11n ONNX via onnxruntime)...")
+                    logger.info("Loading Weapon Detector...")
                     start_time = time.time()
                     
                     from ai_engine.models.weapon_detector import WeaponDetector
@@ -179,8 +172,29 @@ class AIModelManager:
                     
                     logger.info(f"Weapon Detector loaded in {load_time:.2f}s")
                     self._log_memory_usage()
-        
         return self._weapon_detector
+
+    def get_pose_estimator(self):
+        """Get pose estimator - lazy loaded with thread safety"""
+        if self._pose_estimator is None:
+            with self._pose_estimator_lock:
+                if self._pose_estimator is None:
+                    logger.info("Loading Pose Estimator...")
+                    start_time = time.time()
+                    
+                    from ai_engine.models.pose_estimator import PoseEstimator
+                    self._pose_estimator = PoseEstimator()
+                    
+                    load_time = time.time() - start_time
+                    self._load_times['pose_estimator'] = load_time
+                    self._models_loaded['pose_estimator'] = True
+                    self._inference_counts['pose_estimator'] = 0
+                    
+                    logger.info(f"Pose Estimator loaded in {load_time:.2f}s")
+                    self._log_memory_usage()
+        return self._pose_estimator
+    
+
     
     def get_anti_spoof(self):
         """Get anti-spoof detector - lazy loaded with thread safety"""
@@ -245,26 +259,7 @@ class AIModelManager:
         
         return self._deepfake_detector
     
-    def get_object_detector(self):
-        """Get object detector (YOLOv8) - lazy loaded with thread safety"""
-        if self._object_detector is None:
-            with self._object_detector_lock:
-                if self._object_detector is None:
-                    logger.info("Loading Object Detector (YOLOv8)...")
-                    start_time = time.time()
-                    
-                    from ai_engine.models.object_detector import ObjectDetector
-                    self._object_detector = ObjectDetector()
-                    
-                    load_time = time.time() - start_time
-                    self._load_times['object_detector'] = load_time
-                    self._models_loaded['object_detector'] = True
-                    self._inference_counts['object_detector'] = 0
-                    
-                    logger.info(f"Object Detector loaded in {load_time:.2f}s")
-                    self._log_memory_usage()
-        
-        return self._object_detector
+
     
     def _log_memory_usage(self):
         """Log current memory usage"""
@@ -318,15 +313,12 @@ class AIModelManager:
         logger.warning("Cleaning up AI models...")
         
         # Clear model instances
-        self._face_detector = None
+        self._unified_perception_engine = None
         self._face_recognizer = None
         self._emotion_detector = None
-        self._pose_estimator = None
-        self._weapon_detector = None
         self._anti_spoof = None
         self._age_estimator = None
         self._deepfake_detector = None
-        self._object_detector = None
         self._detection_pipeline = None
         
         # Reset status
@@ -338,9 +330,9 @@ class AIModelManager:
     
     # Convenience properties for direct access
     @property
-    def face_detector(self):
-        """Direct access to face detector"""
-        return self.get_face_detector()
+    def unified_perception_engine(self):
+        """Direct access to unified YOLO engine"""
+        return self.get_unified_perception_engine()
     
     @property
     def face_recognizer(self):
@@ -351,16 +343,6 @@ class AIModelManager:
     def emotion_detector(self):
         """Direct access to emotion detector"""
         return self.get_emotion_detector()
-    
-    @property
-    def pose_estimator(self):
-        """Direct access to pose estimator"""
-        return self.get_pose_estimator()
-    
-    @property
-    def weapon_detector(self):
-        """Direct access to weapon detector"""
-        return self.get_weapon_detector()
     
     @property
     def anti_spoof(self):
@@ -378,9 +360,19 @@ class AIModelManager:
         return self.get_deepfake_detector()
     
     @property
-    def object_detector(self):
-        """Direct access to object detector"""
-        return self.get_object_detector()
+    def weapon_detector(self):
+        return self.get_weapon_detector()
+
+    @property
+    def pose_estimator(self):
+        return self.get_pose_estimator()
+
+    @property
+    def face_detector(self):
+        return self.get_face_detector()
+
+    
+
 
 
 # Global singleton instance

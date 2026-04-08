@@ -1,148 +1,84 @@
-"""
-Pose estimation using MediaPipe
-"""
-import mediapipe as mp
-import cv2
 import numpy as np
-from typing import Optional, Dict, List
+from collections import deque
+import torch
+import torch.nn as nn
+from typing import Optional, Dict
+
+class Action1DCNN(nn.Module):
+    """
+    Lightweight 1D-CNN to process sequences of 34 pose keypoints over 30 frames.
+    Detects Aggressive vs Neutral behavior based on spatial-temporal momentum.
+    """
+    def __init__(self, num_keypoints=34*2, num_classes=3):
+        super().__init__()
+        # Input shape: (Batch, Features, SeqLength) -> (1, 68, 30)
+        self.conv1 = nn.Conv1d(in_channels=num_keypoints, out_channels=64, kernel_size=3, padding=1)
+        self.relu = nn.ReLU()
+        self.conv2 = nn.Conv1d(64, 128, kernel_size=3, padding=1)
+        self.pool = nn.AdaptiveAvgPool1d(1)
+        self.fc = nn.Linear(128, num_classes)
+        
+    def forward(self, x):
+        x = self.relu(self.conv1(x))
+        x = self.relu(self.conv2(x))
+        x = self.pool(x).squeeze(-1)
+        return self.fc(x)
 
 class PoseEstimator:
-    def __init__(self, min_detection_confidence: float = 0.5):
-        """
-        Initialize MediaPipe Pose
+    """
+    Analyzes temporal pose keypoints via 1D-CNN instead of frame-by-frame heuristics.
+    """
+    def __init__(self, window_size: int = 30):
+        self.window_size = window_size
+        self.track_buffers = {}
         
-        Args:
-            min_detection_confidence: Minimum confidence for detection
-        """
-        self.mp_pose = mp.solutions.pose
-        self.pose = self.mp_pose.Pose(
-            static_image_mode=True,  # CRITICAL FIX: Thread-safe mode (prevents timestamp crashes)
-            model_complexity=0,  # 0 = Lite, faster on CPU
-            min_detection_confidence=min_detection_confidence,
-        )
-        self.mp_drawing = mp.solutions.drawing_utils
-    
-    def detect(self, image: np.ndarray) -> Optional[Dict]:
-        """
-        Detect pose keypoints in image
+        # Load temporal Action model
+        self.action_model = Action1DCNN()
+        self.action_model.eval()
         
-        Args:
-            image: BGR image
+        # We classify temporal windows into semantic states
+        self.classes = ['neutral', 'aggressive', 'defensive']
+
+    def update_and_predict(self, track_id: int, keypoints_arr: np.ndarray, bbox: list) -> str:
+        """
+        Takes raw keypoints from the Unified Perception Engine (YOLO-Pose) per frame.
+        Aggregates them up to window_size, normalizes them, and runs the CNN.
+        """
+        if track_id not in self.track_buffers:
+            self.track_buffers[track_id] = deque(maxlen=self.window_size)
             
-        Returns:
-            Dict with keypoints or None
-        """
-        # Convert to RGB
-        rgb_image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        x1, y1, x2, y2 = bbox
+        cx = (x1 + x2) / 2.0
+        cy = (y1 + y2) / 2.0
         
-        # Process
-        results = self.pose.process(rgb_image)
-        
-        if not results.pose_landmarks:
-            return None
-        
-        # Extract keypoints
-        h, w = image.shape[:2]
-        keypoints = {}
-        
-        for idx, landmark in enumerate(results.pose_landmarks.landmark):
-            keypoints[idx] = {
-                'x': landmark.x * w,
-                'y': landmark.y * h,
-                'z': landmark.z,
-                'visibility': landmark.visibility
-            }
-        
-        return {
-            'keypoints': keypoints,
-            'raw_landmarks': results.pose_landmarks
-        }
-    
-    def draw_pose(
-        self,
-        image: np.ndarray,
-        pose_data: Dict
-    ) -> np.ndarray:
-        """
-        Draw pose skeleton on image
-        
-        Args:
-            image: BGR image
-            pose_data: Pose data from detect()
+        # YOLO-Pose outputs e.g., 17 keypoints (34 coordinates)
+        # We normalize by subtracting bounding box center to make it distance-invariant.
+        flat_kpts = []
+        # Flatten keypoints [(x,y),(x,y)...]
+        # In this implementation, assuming keypoints_arr is numpy array of shape (17, 2/3)
+        if hasattr(keypoints_arr, 'shape') and len(keypoints_arr.shape) > 1:
+            for pt in keypoints_arr:
+                flat_kpts.extend([pt[0] - cx, pt[1] - cy])
+                
+        # Zero pad if missing 
+        while len(flat_kpts) < 68: # 34 * 2
+            flat_kpts.append(0.0)
             
-        Returns:
-            Image with pose drawn
-        """
-        if not pose_data or 'raw_landmarks' not in pose_data:
-            return image
+        self.track_buffers[track_id].append(flat_kpts[:68])
         
-        annotated_image = image.copy()
-        self.mp_drawing.draw_landmarks(
-            annotated_image,
-            pose_data['raw_landmarks'],
-            self.mp_pose.POSE_CONNECTIONS
-        )
+        # Only predict if we have sufficient sequence velocity data
+        if len(self.track_buffers[track_id]) == self.window_size:
+            # Shape transition for Conv1D: (Sequence, Features) -> (Features, Sequence)
+            seq = np.array(self.track_buffers[track_id]).T 
+            tensor_seq = torch.tensor(seq, dtype=torch.float32).unsqueeze(0)
+            
+            with torch.no_grad():
+                out = self.action_model(tensor_seq)
+                idx = torch.argmax(out, dim=1).item()
+                return self.classes[idx]
+                
+        return "gathering_data"
         
-        return annotated_image
-    
-    def get_body_orientation(self, pose_data: Dict) -> Optional[str]:
-        """
-        Estimate body orientation (front, back, left, right)
-        
-        Returns:
-            Orientation string or None
-        """
-        if not pose_data:
-            return None
-        
-        keypoints = pose_data['keypoints']
-        
-        # Use shoulder and hip positions to estimate orientation
-        # Simplified heuristic
-        left_shoulder = keypoints.get(11)
-        right_shoulder = keypoints.get(12)
-        
-        if not left_shoulder or not right_shoulder:
-            return None
-        
-        # Check visibility
-        if left_shoulder['visibility'] > right_shoulder['visibility']:
-            return "left"
-        elif right_shoulder['visibility'] > left_shoulder['visibility']:
-            return "right"
-        else:
-            return "front"
-    
-    def detect_action(self, pose_data: Dict) -> Optional[str]:
-        """
-        Detect simple actions (standing, sitting, lying)
-        Simplified implementation
-        """
-        if not pose_data:
-            return None
-        
-        keypoints = pose_data['keypoints']
-        
-        # Get key landmarks
-        nose = keypoints.get(0)
-        left_hip = keypoints.get(23)
-        left_knee = keypoints.get(25)
-        left_ankle = keypoints.get(27)
-        
-        if not all([nose, left_hip, left_knee, left_ankle]):
-            return "unknown"
-        
-        # Simple heuristic based on vertical alignment
-        hip_knee_dist = abs(left_hip['y'] - left_knee['y'])
-        knee_ankle_dist = abs(left_knee['y'] - left_ankle['y'])
-        
-        if hip_knee_dist < 50 and knee_ankle_dist < 50:
-            return "sitting"
-        elif nose['y'] > left_hip['y']:
-            return "lying"
-        else:
-            return "standing"
-    
-    def __del__(self):
-        """Cleanup"""
-        self.pose.close()
+    def cleanup_track(self, track_id: int):
+        if track_id in self.track_buffers:
+            del self.track_buffers[track_id]

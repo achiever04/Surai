@@ -7,11 +7,15 @@ import numpy as np
 from datetime import datetime
 from loguru import logger
 
-from ai_engine.pipelines.detection_pipeline import DetectionPipeline, DetectionResult
+from ai_engine.pipelines.detection_pipeline import DetectionResult
 from app.services.detection_service import DetectionService
 from app.services.watchlist_service import WatchlistService
 from app.services.notification_service import notification_service
 from sqlalchemy.ext.asyncio import AsyncSession
+from ai_engine.model_manager import ai_model_manager
+from ai_engine.utils.shared_memory_pool import shm_pool
+from ai_engine.pipelines.tracker_manager import TrackerManager
+from ai_engine.pipelines.async_worker_pool import AsyncWorkerPool
 
 class StreamProcessor:
     """Process camera frames for detections"""
@@ -29,8 +33,12 @@ class StreamProcessor:
         self.watchlist_service = WatchlistService(db_session)
         self.notification_service = notification_service
         
-        # Initialize AI pipeline
-        self.pipeline = DetectionPipeline(config)
+        # Initialize Phase Architecture (YOLO + Tracker + Async Pool)
+        self.tracker_manager = TrackerManager()
+        self.async_pool = AsyncWorkerPool(self.watchlist_service, self.tracker_manager)
+        
+        # Ensure workers start (using a task)
+        asyncio.create_task(self.async_pool.start())
         
         # Processing settings
         self.process_every_n = config.get('process_every_n', 3)
@@ -66,19 +74,54 @@ class StreamProcessor:
             return
         
         try:
-            # Update watchlist cache if needed
-            await self._update_watchlist_cache()
+            # 1. Allocate to zero-copy memory pool (Stage 1 Ingestion)
+            shm_name = shm_pool.allocate_frame(frame)
+            shm_frame = shm_pool.get_frame(shm_name, frame.shape, frame.dtype)
+
+            # 2. Run Unified YOLO Pass (Fast thread)
+            yolo_results = ai_model_manager.unified_perception_engine.infer(shm_frame)
             
-            # Run detection pipeline
-            result = await self.pipeline.process_frame(
-                frame,
-                watchlist_embeddings=self.watchlist_cache,
-                skip_motion_check=False
-            )
+            # 3. Process Tracking & Get Emissions
+            track_outputs, emissions = self.tracker_manager.process_detections(yolo_results)
             
-            # Handle detection result
-            if result and result.has_face:
-                await self._handle_detection(camera_id, frame, result)
+            # 4. Dispatch new tracks to Async Deep Analysis
+            for emission in emissions:
+                # Fire and forget enqueue
+                await self.async_pool.submit_job(
+                    emission['track_id'], 
+                    shm_frame.copy(), 
+                    emission['box']
+                )
+
+            # Temporary legacy DetectionResult mapping for _handle_detection backward compatibility
+            # We construct a mock result since we replaced DetectionPipeline natively
+            if len(track_outputs) > 0:
+                for track in track_outputs:
+                    # Emulate passing to UI / WebSocket here if necessary
+                    # For saving database detections, we evaluate if it was marked as a weapon or face matched
+                    mock_result = DetectionResult(
+                        has_face=track.get('class') == 0,
+                        has_weapon=track.get('class') == 2, # Assuming 2 is weapon inside Unified YOLO
+                        face_bbox=track.get('box'),
+                        is_real_face=True,
+                        face_quality_score=0.9,
+                        emotion=track.get('emotion'),
+                        action=None,
+                        body_orientation=None,
+                        age=None,
+                        matched_person_id=None,
+                        confidence=track.get('confidence'),
+                        weapons_detected=[{'is_weapon': True}] if track.get('class') == 2 else [],
+                        metadata={}
+                    )
+                    
+                    if track.get('identity') and track.get('identity').startswith('ID:'):
+                        mock_result.matched_person_id = int(track.get('identity').replace('ID:', ''))
+                        
+                    await self._handle_detection(camera_id, frame, mock_result)
+                    
+            # 5. Free frame memory
+            shm_pool.free_frame(shm_name)
                 
         except Exception as e:
             logger.error(f"Error processing frame from camera {camera_id}: {e}")

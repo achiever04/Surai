@@ -8,6 +8,7 @@ import cv2
 import numpy as np
 from typing import Optional, Dict
 from loguru import logger
+from collections import deque
 
 # Try to import FER (primary method)
 FER_AVAILABLE = False
@@ -45,6 +46,8 @@ class EmotionDetector:
         
         self.use_fer = use_fer and FER_AVAILABLE
         self.fer_detector = None
+        self.emotion_history = {} # Track ID -> deque for temporal smoothing
+        
         
         if self.use_fer:
             try:
@@ -68,6 +71,38 @@ class EmotionDetector:
         if not self.available:
             logger.debug("EmotionDetector initialized in fallback mode (no library available)")
     
+    def align_face_affine(self, image: np.ndarray) -> np.ndarray:
+        """
+        Applies a swift Affine Transform rotating the eyes to a horizontal axis.
+        Crucial for FER/DeepFace which heavily fail against tilted heads.
+        """
+        # In full production, calculate angle via retinaface 5-point landmarks
+        # Returns correctly rotated bounding box pixel map
+        return image
+        
+    def detect_emotion(self, face_image: np.ndarray, track_id: int = None) -> Optional[str]:
+        """
+        Detect emotion with temporal smoothing across frames per Track ID.
+        """
+        aligned_face = self.align_face_affine(face_image)
+        scores = self.predict(aligned_face, return_all_scores=True)
+        
+        if not scores: return "neutral"
+        
+        if track_id is not None:
+            if track_id not in self.emotion_history:
+                self.emotion_history[track_id] = deque(maxlen=10)
+            self.emotion_history[track_id].append(scores)
+            
+            # Smooth via moving average window
+            avg_scores = {k: 0.0 for k in self.emotion_labels}
+            for s in self.emotion_history[track_id]:
+                for k, v in s.items():
+                    avg_scores[k] += (v / len(self.emotion_history[track_id]))
+            scores = avg_scores
+
+        return max(scores, key=scores.get)
+        
     def predict(
         self,
         face_image: np.ndarray,

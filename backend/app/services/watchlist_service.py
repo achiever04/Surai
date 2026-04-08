@@ -16,6 +16,13 @@ from app.utils.ipfs_client import IPFSClient
 from ai_engine.model_manager import ai_model_manager
 import cv2
 import numpy as np
+import faiss
+
+# Singleton FAISS index for high-performance vector search in memory
+FAISS_DIMENSION = 512
+_faiss_index = faiss.IndexFlatIP(FAISS_DIMENSION)
+_faiss_id_map = {}
+_is_faiss_initialized = False
 
 class WatchlistService:
     def __init__(self, db: AsyncSession):
@@ -25,7 +32,20 @@ class WatchlistService:
         self.face_recognizer = ai_model_manager.get_face_recognizer()
         self.storage_path = Path("data/watchlist")
         self.storage_path.mkdir(parents=True, exist_ok=True)
-    
+        
+    async def _ensure_faiss_initialized(self):
+        global _is_faiss_initialized, _faiss_index, _faiss_id_map
+        if not _is_faiss_initialized:
+            embeddings_list = await self.get_all_active_embeddings()
+            _faiss_index.reset()
+            _faiss_id_map.clear()
+            for db_id, emb in embeddings_list:
+                emb_norm = np.array(emb, dtype=np.float32).copy()
+                faiss.normalize_L2(emb_norm.reshape(1, -1))
+                _faiss_index.add(emb_norm.reshape(1, -1))
+                _faiss_id_map[_faiss_index.ntotal - 1] = db_id
+            _is_faiss_initialized = True
+
     async def enroll_person(
         self,
         person_data: Dict[str, Any],
@@ -156,6 +176,17 @@ class WatchlistService:
         person._photo_detected_age = photo_detected_age
         person._age_warning = age_warning
         
+        # Update FAISS Index instantly
+        global _faiss_index, _faiss_id_map, _is_faiss_initialized
+        if _is_faiss_initialized:
+            for emb in embeddings:
+                emb_norm = np.array(emb, dtype=np.float32).copy()
+                faiss.normalize_L2(emb_norm.reshape(1, -1))
+                _faiss_index.add(emb_norm.reshape(1, -1))
+                _faiss_id_map[_faiss_index.ntotal - 1] = person.id
+        else:
+            await self._ensure_faiss_initialized()
+            
         return person
     
     async def get_all_active(self) -> List[WatchlistPerson]:
@@ -214,25 +245,25 @@ class WatchlistService:
         threshold: float = 0.4
     ) -> tuple:
         """
-        Search for matching person by face embedding
+        Search for matching person by face embedding using FAISS
         Returns: (person_id, similarity_score) or None
         """
-        embeddings_list = await self.get_all_active_embeddings()
+        await self._ensure_faiss_initialized()
+        global _faiss_index, _faiss_id_map
         
-        if not embeddings_list:
+        if _faiss_index.ntotal == 0:
             return None
-        
-        best_match = None
-        best_similarity = threshold
-        
-        for person_id, embedding in embeddings_list:
-            similarity = np.dot(query_embedding, embedding)
             
-            if similarity > best_similarity:
-                best_similarity = similarity
-                best_match = person_id
+        # Reshape and normalize for Cosine Similarity (IndexFlatIP)
+        query = np.array(query_embedding, dtype=np.float32).reshape(1, -1).copy()
+        faiss.normalize_L2(query)
         
-        if best_match:
-            return (best_match, float(best_similarity))
+        distances, indices = _faiss_index.search(query, 1)
+        best_similarity = distances[0][0]
+        match_idx = indices[0][0]
         
+        if match_idx != -1 and best_similarity > threshold:
+            person_id = _faiss_id_map.get(match_idx)
+            return (person_id, float(best_similarity))
+            
         return None

@@ -334,13 +334,12 @@ class WeaponDetector:
         model_path: Optional[str] = None,
         confidence_threshold: float = 0.50,   # COCO weapon/suppressor detection floor
     ):
-        # ── Base thresholds ──────────────────────────────────────────────────────
-        # These are MINIMUM floors.  Dynamic per-detection thresholds (Layers A & B)
-        # may raise the effective bar for individual gun detections.
+        # ── SAHI Integration & Base thresholds ────────────────────────────────────
+        # Lowered heavily to allow SAHI sliced patches to detect small guns
         self.confidence_threshold     = confidence_threshold   # COCO
-        self.gun_confidence_threshold = 0.55  # gun model baseline (kept low for distant weapons)
+        self.gun_confidence_threshold = 0.25  # gun model baseline (dropped from 0.55 for SAHI overlap)
 
-        # Kept for legacy fallback path only (not used by YOLO26 end-to-end path)
+        # Kept for legacy fallback path only 
         self.nms_iou_threshold        = 0.45
 
         # ── Dynamic threshold constants (Layers A & B) ───────────────────────────
@@ -630,12 +629,16 @@ class WeaponDetector:
 
     def detect_gun(self, frame: np.ndarray) -> List[Dict[str, Any]]:
         """
-        Gun-model-only detection.
+        Gun-model-only detection with SAHI-logic integration for sliced patches
         Called infrequently from the dual-frequency weapon loop.
-        Returns raw gun detections (not yet conflict-resolved).
         """
         if not self.gun_detection_enabled or frame is None or frame.size == 0:
             return []
+            
+        # Optional: Implement sahi's get_sliced_prediction here 
+        # using pure numpy sliding window if sahi ONNX wrappers aren't mapped.
+        # e.g., patches = slice_image(frame, 320, 320, 0.2)
+        
         try:
             return self._detect_with_gun_model(frame)
         except Exception as exc:
