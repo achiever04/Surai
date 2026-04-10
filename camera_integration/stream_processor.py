@@ -16,6 +16,7 @@ from ai_engine.model_manager import ai_model_manager
 from ai_engine.utils.shared_memory_pool import shm_pool
 from ai_engine.pipelines.tracker_manager import TrackerManager
 from ai_engine.pipelines.async_worker_pool import AsyncWorkerPool
+from ai_engine.utils.profiler import profiler
 
 class StreamProcessor:
     """Process camera frames for detections"""
@@ -122,6 +123,9 @@ class StreamProcessor:
                     
             # 5. Free frame memory
             shm_pool.free_frame(shm_name)
+            
+            if self.frame_counters[camera_id] % 100 == 0:
+                profiler.log_stats()
                 
         except Exception as e:
             logger.error(f"Error processing frame from camera {camera_id}: {e}")

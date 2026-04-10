@@ -6,15 +6,13 @@ from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
 from config.settings import settings
 
-# Create async engine (for FastAPI endpoints)
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    echo=False,
-    future=True,
-    pool_pre_ping=True,
-    pool_size=5,
-    max_overflow=10
-)
+engine_kwargs = {"echo": False, "future": True}
+if "sqlite" in settings.DATABASE_URL:
+    engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    engine_kwargs.update({"pool_pre_ping": True, "pool_size": 5, "max_overflow": 10})
+
+engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
 
 # Create async session factory
 AsyncSessionLocal = sessionmaker(
@@ -26,15 +24,20 @@ AsyncSessionLocal = sessionmaker(
 )
 
 # Create SYNC engine for background threads (detection processor)
-# Convert async URL to sync URL (asyncpg -> psycopg2)
-sync_db_url = settings.DATABASE_URL.replace("postgresql+asyncpg://", "postgresql://")
-sync_engine = create_engine(
-    sync_db_url,
-    echo=False,
-    pool_pre_ping=True,
-    pool_size=3,
-    max_overflow=5
-)
+# Convert async URL to sync URL
+sync_db_url = settings.DATABASE_URL
+if "postgresql+asyncpg" in sync_db_url:
+    sync_db_url = sync_db_url.replace("postgresql+asyncpg://", "postgresql://")
+elif "sqlite+aiosqlite" in sync_db_url:
+    sync_db_url = sync_db_url.replace("sqlite+aiosqlite://", "sqlite://")
+
+sync_engine_kwargs = {"echo": False}
+if "sqlite" in sync_db_url:
+    sync_engine_kwargs["connect_args"] = {"check_same_thread": False}
+else:
+    sync_engine_kwargs.update({"pool_pre_ping": True, "pool_size": 3, "max_overflow": 5})
+
+sync_engine = create_engine(sync_db_url, **sync_engine_kwargs)
 
 # Sync session factory for background threads
 SyncSessionLocal = sessionmaker(

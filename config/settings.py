@@ -18,9 +18,7 @@ class Settings(BaseSettings):
     POSTGRES_PORT: int = 5432
     POSTGRES_DB: str = "surveillance_db"
     
-    @property
-    def DATABASE_URL(self) -> str:
-        return f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
+    DATABASE_URL: str = "postgresql+asyncpg://surveillance_user:secure_password_123@localhost:5432/surveillance_db"
     
     # Redis
     REDIS_HOST: str = "localhost"

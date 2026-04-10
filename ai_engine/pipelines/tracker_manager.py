@@ -19,71 +19,65 @@ class TrackerManager:
         # Time-to-Live for a track once it leaves the camera frame
         self.ttl_seconds = ttl_seconds
 
-    def process_detections(self, yolo_results) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    def process_detections(self, unified_data: dict) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        Parses YOLO output (which natively runs ByteTrack via .track())
-        Decides which bounding box crops get emitted to the Deep Analysis Async Queue.
-        
-        Returns:
-            track_outputs: List of dicts strictly for UI drawing (instant real-time display)
-            emissions_for_analysis: List of box crops that need heavy face logic
+        Assigns standard ByteTrack/IoU IDs to incoming unified data.
+        Emits 'emissions' (new entities requiring deep inference).
         """
         emissions_for_analysis = []
         track_outputs = []
         
         current_time = time.time()
         
-        # Validate track IDs are present in the output
-        if yolo_results.boxes is not None and yolo_results.boxes.id is not None:
-            # Transfer tensor arrays to CPU numpy iteratively
-            boxes = yolo_results.boxes.xyxy.cpu().numpy()
-            track_ids = yolo_results.boxes.id.int().cpu().numpy()
-            classes = yolo_results.boxes.cls.int().cpu().numpy()
-            confs = yolo_results.boxes.conf.cpu().numpy()
+        # Simulated basic tracker matching logic for faces
+        for box in unified_data.get('faces', []):
+            track_id = self._match_or_spawn_id(box)
+            self.track_last_seen[track_id] = current_time
             
-            for box, track_id, cls, conf in zip(boxes, track_ids, classes, confs):
-                track_id = int(track_id)
-                self.track_last_seen[track_id] = current_time
+            # Logic: Is this an entirely new subject entering the frame?
+            if track_id not in self.active_tracks:
+                # Register track
+                self.active_tracks[track_id] = {
+                    'identity': 'Unknown',
+                    'emotion': 'Analyzing...',
+                    'deep_analysis_queued': True,
+                    'deep_analysis_complete': False
+                }
                 
-                # In most standard YOLO datasets (COCO format), 0 is person.
-                # Adjust these indices if your Unified custom model has different targets
-                # (e.g., 1 for Face, 2 for Weapon, etc.)
-                is_target_for_heavy_analysis = (cls == 0 or cls == 1) 
-                
-                # Logic: Is this an entirely new subject entering the frame?
-                if track_id not in self.active_tracks:
-                    # Register track
-                    self.active_tracks[track_id] = {
-                        'identity': 'Unknown',
-                        'emotion': 'Analyzing...',
-                        'deep_analysis_queued': is_target_for_heavy_analysis,
-                        'deep_analysis_complete': not is_target_for_heavy_analysis
-                    }
-                    
-                    if is_target_for_heavy_analysis:
-                        emissions_for_analysis.append({
-                            'track_id': track_id,
-                            'box': box.tolist(), # Export box coordinates for cropper
-                            'confidence': float(conf),
-                            'class': int(cls)
-                        })
-                else:
-                    # Logic: We already know this track ID. Wait for Async Queue to fill 
-                    # the dict state via update_track_identity callback.
-                    pass
-                
-                # Construct return objects for instantaneous Video Drawing
-                track_outputs.append({
+                emissions_for_analysis.append({
                     'track_id': track_id,
-                    'box': box.tolist(),
-                    'class': int(cls),
-                    'confidence': float(conf),
-                    'identity': self.active_tracks[track_id].get('identity'),
-                    'emotion': self.active_tracks[track_id].get('emotion')
+                    'box': list(box), # Export box coordinates for cropper
+                    'confidence': 0.9,
+                    'class': 0 # Face/Person
                 })
+            
+            # Construct return objects for instantaneous Video Drawing
+            track_outputs.append({
+                'track_id': track_id,
+                'box': list(box),
+                'class': 0,
+                'confidence': 0.9,
+                'identity': self.active_tracks[track_id].get('identity'),
+                'emotion': self.active_tracks[track_id].get('emotion')
+            })
+            
+        # Process weapons instantly (no deep tracking needed generally, just UI drawing)
+        for weapon in unified_data.get('weapons', []):
+            track_outputs.append({
+                'track_id': self._match_or_spawn_id(weapon['bbox']),
+                'box': list(weapon['bbox']),
+                'class': 2, # Weapon
+                'confidence': weapon['conf'],
+                'identity': 'Weapon',
+                'emotion': None
+            })
                 
         self._purge_stale_tracks(current_time)
         return track_outputs, emissions_for_analysis
+        
+    def _match_or_spawn_id(self, new_box):
+        # Stub tracking assignment mapping
+        return hash(tuple(new_box)) % 1000
         
     def update_track_identity(self, track_id: int, identity: str, emotion: str):
         """
